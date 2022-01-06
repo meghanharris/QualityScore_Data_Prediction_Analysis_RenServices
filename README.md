@@ -1,0 +1,2 @@
+# QualityScore
+In this project, I worked with Renaissance Services and Perfect-3D to understand if certain environment variables (Temperature, Humidity, Pressure, Dust, UV) that lead to a better quality score (0-5). In this repository, I show how I cleaned the data within Python (breaking out by year and quality score), exploratory data analysis (correlation and relationship analysis within R), and modeling prediction (creating a shiny app for the company to use within R).
