@@ -1,0 +1,464 @@
+###RenaissanceServices###
+
+#DataCleaning
+#importing files
+import datetime
+import pandas as pd
+import numpy as np
+
+batchlisting= pd.read_excel("/Users/meghanharris/Desktop/Project/Batch Listing.xlsx",dtype={"jobnumber": str, "Batch ID": str})
+#joblist= pd.read_csv("/Users/meghanharris/Desktop/Project/JobList.csv")
+printbatch=pd.read_excel("/Users/meghanharris/Desktop/Project/Printing Batches.xlsx",dtype={"Batch ID":str, "Batch Finish": datetime.datetime})
+firebatch= pd.read_excel("/Users/meghanharris/Desktop/Project/Firing Batches.xlsx",dtype={"Batch ID":str, "Batch Finish": datetime.datetime})
+quality=pd.read_excel("/Users/meghanharris/Desktop/QualityScorebyJob.xlsx",dtype={"Result Value": int})
+env= pd.read_excel("/Users/meghanharris/Desktop/Project/Env2021.xlsx", sheet_name="Unit1")
+
+#splitting batchlisting based on print/fire batches
+#fire
+fireid= batchlisting.loc[(batchlisting["Name"] == "Sinter Parts")]
+fireid= fireid.rename(columns={"Batch":"FireID"})
+fireid=fireid.drop(["Name"],axis=1)
+#print(fireid)
+#print
+printid= batchlisting.loc[(batchlisting["Name"] == "Build Parts")]
+printid= printid.rename(columns={"Batch":"PrintID"})
+printid=printid.drop(["Name"],axis=1)
+#cleaning print
+i= printid[((printid.PrintID == "TESTRCH"))].index
+printid= printid.drop(i)
+x= printid[((printid.PrintID == "TEST01"))].index
+printid=printid.drop(x)
+w= printid[((printid.PrintID == "9154A"))].index
+printid=printid.drop(w)
+#print(printid)
+
+#merging print/fire batch ids based on job number
+ids= fireid.merge(printid, on=["jobnumber"])
+
+#merging job number w/ quality score
+quality= quality.drop(["Serial Number"], axis=1)
+quality= quality.rename(columns={"Result Value": "Quality Score"})
+job_id_qual= ids.merge(quality, on=["jobnumber"])
+job_id_qual= job_id_qual.drop_duplicates()
+#print(job_id_qual)
+
+#bringing in printing batches and firing batches
+printbatch= printbatch.drop(["Batch Start", "Printer", "Part Count", "Last Layer", "Resin", "Dp", "Ec", "Layer Thick.", "Z Comp", "LScatter Comp", "Part OC", "Support OC", "Light Source", "Volume", "Surface Area", "Estimated Cost (mL)"],axis=1)
+firebatch= firebatch.drop(["Furnace ID", "Batch Finish", "Cycle", "Time Thru BBO", "Post BBO Ramp Time", "Time 2 Soak", "Time @ Soak", "Max Temp", "Cristobalite Trans. Time", "Cooling Divergence Temp"], axis=1)
+printbatch= printbatch.rename(columns={"Batch ID": "PrintID"})
+firebatch= firebatch.rename(columns={"Batch ID": "FireID"})
+#print(printbatch)
+#print(firebatch)
+
+#merging printbatch and printid based on jobnumber
+mergedf= printid.merge(printbatch, on=["PrintID"])
+#print(mergedf)
+
+#merging firebatch and fireid based on jobnumber
+mergedf1= fireid.merge(firebatch, on=["FireID"])
+#print(mergedf1)
+
+#merging fire and print together based on jobnumber
+allmerged= mergedf.merge(mergedf1, on=["jobnumber"])
+
+#np.savetxt("/Users/meghanharris/Desktop/RENSERV_CleanedData.csv",allmerged, fmt='%s',delimiter=',')
+
+###PREPPING FOR ANALYSIS###
+#splitting data based on quality scores
+allmerged["TimeDiff"] = allmerged["Batch Start"] - allmerged["Batch Finish"]
+d= allmerged[((allmerged.jobnumber == "X120"))].index
+allmerged=allmerged.drop(d)
+
+drop0= allmerged[((allmerged.jobnumber == "C55"))].index
+allmerged=allmerged.drop(drop0)
+
+drop1= allmerged[((allmerged.jobnumber == "C56"))].index
+allmerged=allmerged.drop(drop1)
+
+drop2= allmerged[((allmerged.jobnumber == "C57"))].index
+allmerged=allmerged.drop(drop2)
+
+#np.savetxt("/Users/meghanharris/Desktop/RENSERV_TimeDiff.csv",allmerged, fmt='%s',delimiter=',')
+
+new= allmerged.filter(["jobnumber","Batch Finish", "Batch Start", "TimeDiff"], axis=1)
+new= new.merge(quality, on= ["jobnumber"])
+
+#separating based on quality score
+qlty0= new.loc[(new["Quality Score"] == 0)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality0.csv",qlty0, fmt='%s',delimiter=',')
+qlty1= new.loc[(new["Quality Score"] == 1)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality1.csv",qlty1, fmt='%s',delimiter=',')
+qlty2= new.loc[(new["Quality Score"] == 2)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality2.csv",qlty2, fmt='%s',delimiter=',')
+qlty3= new.loc[(new["Quality Score"] == 3)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality3.csv",qlty3, fmt='%s',delimiter=',')
+qlty4= new.loc[(new["Quality Score"] == 4)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality4.csv",qlty4, fmt='%s',delimiter=',')
+qlty5= new.loc[(new["Quality Score"] == 5)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality5.csv",qlty5, fmt='%s',delimiter=',')
+
+#separating for just values in 2021
+
+qlty0["Year"]= qlty0["Batch Start"].apply(lambda x: x.year)
+qlty1["Year"]= qlty1["Batch Start"].apply(lambda x: x.year)
+qlty2["Year"]= qlty2["Batch Start"].apply(lambda x: x.year)
+qlty3["Year"]= qlty3["Batch Start"].apply(lambda x: x.year)
+qlty4["Year"]= qlty4["Batch Start"].apply(lambda x: x.year)
+qlty5["Year"]= qlty5["Batch Start"].apply(lambda x: x.year)
+
+qlty0= qlty0.loc[(qlty0["Year"] == 2021)]
+qlty1= qlty1.loc[(qlty1["Year"] == 2021)]
+qlty2= qlty2.loc[(qlty2["Year"] == 2021)]
+qlty3= qlty3.loc[(qlty3["Year"] == 2021)]
+qlty4= qlty4.loc[(qlty4["Year"] == 2021)]
+qlty5= qlty5.loc[(qlty5["Year"] == 2021)]
+
+#rounding time for easy reference to env2021
+qlty0["Batch Start"]= qlty0["Batch Start"].dt.round("1min")
+qlty0["Batch Finish"]= qlty0["Batch Finish"].dt.round("1min")
+qlty0["TimeDiff"]= qlty0["TimeDiff"].dt.round("1min")
+qlty1["Batch Start"]= qlty1["Batch Start"].dt.round("1min")
+qlty1["Batch Finish"]= qlty1["Batch Finish"].dt.round("1min")
+qlty1["TimeDiff"]= qlty1["TimeDiff"].dt.round("1min")
+qlty2["Batch Start"]= qlty2["Batch Start"].dt.round("1min")
+qlty2["Batch Finish"]= qlty2["Batch Finish"].dt.round("1min")
+qlty2["TimeDiff"]= qlty2["TimeDiff"].dt.round("1min")
+qlty3["Batch Start"]= qlty3["Batch Start"].dt.round("1min")
+qlty3["Batch Finish"]= qlty3["Batch Finish"].dt.round("1min")
+qlty3["TimeDiff"]= qlty3["TimeDiff"].dt.round("1min")
+qlty4["Batch Start"]= qlty4["Batch Start"].dt.round("1min")
+qlty4["Batch Finish"]= qlty4["Batch Finish"].dt.round("1min")
+qlty4["TimeDiff"]= qlty4["TimeDiff"].dt.round("1min")
+qlty5["Batch Start"]= qlty5["Batch Start"].dt.round("1min")
+qlty5["Batch Finish"]= qlty5["Batch Finish"].dt.round("1min")
+qlty5["TimeDiff"]= qlty5["TimeDiff"].dt.round("1min")
+
+#np.savetxt("/Users/meghanharris/Desktop/Quality0_2021.csv",qlty0, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality1_2021.csv",qlty1, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality2_2021.csv",qlty2, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality3_2021.csv",qlty3, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality4_2021.csv",qlty4, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality5_2021.csv",qlty5, fmt='%s',delimiter=',')
+
+#Calculating total amount of 30 seconds intervals to prepare for environment lookup
+qlty0["TimeDiff"] = pd.to_timedelta(qlty0["TimeDiff"])
+qlty0["Total Seconds"]= (qlty0["TimeDiff"].dt.total_seconds())
+
+qlty1["TimeDiff"] = pd.to_timedelta(qlty1["TimeDiff"])
+qlty1["Total Seconds"]= (qlty1["TimeDiff"].dt.total_seconds())
+
+qlty2["TimeDiff"] = pd.to_timedelta(qlty2["TimeDiff"])
+qlty2["Total Seconds"]= (qlty2["TimeDiff"].dt.total_seconds())
+
+qlty3["TimeDiff"] = pd.to_timedelta(qlty3["TimeDiff"])
+qlty3["Total Seconds"]= (qlty3["TimeDiff"].dt.total_seconds())
+
+qlty4["TimeDiff"] = pd.to_timedelta(qlty4["TimeDiff"])
+qlty4["Total Seconds"]= (qlty4["TimeDiff"].dt.total_seconds())
+####no quality 5 score in 2021####
+
+env["timestamp"]= pd.to_datetime(env["timestamp"])
+env["timestamp"]= env["timestamp"].dt.round("1min")
+env= env.groupby("timestamp", as_index=False).agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+#np.savetxt("/Users/meghanharris/Desktop/CleanedEnv_2021.csv",env, fmt='%s',delimiter=',')
+
+#indexing through to pull values from env
+## Quality 0 editing
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+for i in range(len(qlty0)):
+    start = qlty0.iloc[i]["Batch Finish"]
+    end = qlty0.iloc[i]["Batch Start"]
+    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+    hum.append(templist[0])
+    temp.append(templist[1])
+    pres.append(templist[2])
+    uv.append(templist[3])
+    dust.append(templist[4])
+
+qlty0["Humidity"] = hum
+qlty0["Temperature"] = temp
+qlty0["Pressure"] = pres
+qlty0["UV"] = uv
+qlty0["Dust"] = dust
+
+
+## Quality 1 editing
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+for i in range(len(qlty1)):
+    start = qlty1.iloc[i]["Batch Finish"]
+    end = qlty1.iloc[i]["Batch Start"]
+    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+    hum.append(templist[0])
+    temp.append(templist[1])
+    pres.append(templist[2])
+    uv.append(templist[3])
+    dust.append(templist[4])
+
+qlty1["Humidity"] = hum
+qlty1["Temperature"] = temp
+qlty1["Pressure"] = pres
+qlty1["UV"] = uv
+qlty1["Dust"] = dust
+
+## Quality 2 editing
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+for i in range(len(qlty2)):
+    start = qlty2.iloc[i]["Batch Finish"]
+    end = qlty2.iloc[i]["Batch Start"]
+    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+    hum.append(templist[0])
+    temp.append(templist[1])
+    pres.append(templist[2])
+    uv.append(templist[3])
+    dust.append(templist[4])
+
+qlty2["Humidity"] = hum
+qlty2["Temperature"] = temp
+qlty2["Pressure"] = pres
+qlty2["UV"] = uv
+qlty2["Dust"] = dust
+
+## Quality 3 editing
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+for i in range(len(qlty3)):
+    start = qlty3.iloc[i]["Batch Finish"]
+    end = qlty3.iloc[i]["Batch Start"]
+    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+    hum.append(templist[0])
+    temp.append(templist[1])
+    pres.append(templist[2])
+    uv.append(templist[3])
+    dust.append(templist[4])
+
+qlty3["Humidity"] = hum
+qlty3["Temperature"] = temp
+qlty3["Pressure"] = pres
+qlty3["UV"] = uv
+qlty3["Dust"] = dust
+
+## Quality 4 editing
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+for i in range(len(qlty4)):
+    start = qlty4.iloc[i]["Batch Finish"]
+    end = qlty4.iloc[i]["Batch Start"]
+    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+    hum.append(templist[0])
+    temp.append(templist[1])
+    pres.append(templist[2])
+    uv.append(templist[3])
+    dust.append(templist[4])
+
+qlty4["Humidity"] = hum
+qlty4["Temperature"] = temp
+qlty4["Pressure"] = pres
+qlty4["UV"] = uv
+qlty4["Dust"] = dust
+
+##Quality 5 editing
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+for i in range(len(qlty5)):
+    start = qlty5.iloc[i]["Batch Finish"]
+    end = qlty5.iloc[i]["Batch Start"]
+    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+    hum.append(templist[0])
+    temp.append(templist[1])
+    pres.append(templist[2])
+    uv.append(templist[3])
+    dust.append(templist[4])
+
+qlty5["Humidity"] = hum
+qlty5["Temperature"] = temp
+qlty5["Pressure"] = pres
+qlty5["UV"] = uv
+qlty5["Dust"] = dust
+#saving and exporting as csv files
+
+#np.savetxt("/Users/meghanharris/Desktop/FinalQuality0.csv",qlty0, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/FinalQuality1.csv",qlty1, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/FinalQuality2.csv",qlty2, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/FinalQuality3.csv",qlty3, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/FinalQuality4.csv",qlty4, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/FinalQuality5.csv",qlty5, fmt='%s',delimiter=',')
+
+#for all values on 2021
+#new["Year"]= new["Batch Start"].apply(lambda x: x.year)
+#new= new.loc[(new["Year"] == 2021)]
+#new["Batch Start"]= new["Batch Start"].dt.round("1min")
+#new["Batch Finish"]= new["Batch Finish"].dt.round("1min")
+#new["TimeDiff"]= new["TimeDiff"].dt.round("1min")
+#new["TimeDiff"] = pd.to_timedelta(new["TimeDiff"])
+#new["Total Seconds"]= (new["TimeDiff"].dt.total_seconds())
+#hum = []
+#temp = []
+#pres = []
+#uv = []
+#dust = []
+#for i in range(len(new)):
+#    start = new.iloc[i]["Batch Finish"]
+#    end = new.iloc[i]["Batch Start"]
+#    templist = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+#    hum.append(templist[0])
+#    temp.append(templist[1])
+#    pres.append(templist[2])
+#    uv.append(templist[3])
+#    dust.append(templist[4])
+#new["Humidity"] = hum
+#new["Temperature"] = temp
+#new["Pressure"] = pres
+#new["UV"] = uv
+#new["Dust"] = dust
+#np.savetxt("/Users/meghanharris/Desktop/Final2021.csv",new, fmt='%s',delimiter=',')
+
+######ANALYSIS ACROSS ALL YEARS######################
+env2017= pd.read_csv("/Users/meghanharris/Desktop/Env2017.csv")
+env2017_1=pd.read_csv("/Users/meghanharris/Desktop/Env2017_2.csv")
+env2017= pd.concat([env2017,env2017_1], ignore_index=True)
+env2018= pd.read_excel("/Users/meghanharris/Desktop/Env2018.xlsx")
+env2018_1= pd.read_excel("/Users/meghanharris/Desktop/Env2018_2.xlsx")
+env2018_2= pd.read_excel("/Users/meghanharris/Desktop/Env2018_3.xlsx")
+env2018_3= pd.read_excel("/Users/meghanharris/Desktop/Env2018_4.xlsx")
+env2018_4= pd.read_excel("/Users/meghanharris/Desktop/Env2018_5.xlsx")
+env2018_5= pd.read_excel("/Users/meghanharris/Desktop/Env2018_6.xlsx")
+env2018= pd.concat([env2018,env2018_1,env2018_2, env2018_3,env2018_4,env2018_5], ignore_index=True)
+env2019= pd.read_csv("/Users/meghanharris/Desktop/Env2019.csv")
+env2019_1= pd.read_excel("/Users/meghanharris/Desktop/Env2019_2.xlsx")
+env2019_2= pd.read_csv("/Users/meghanharris/Desktop/Env2019_3.csv")
+env2019_3= pd.read_csv("/Users/meghanharris/Desktop/Env2019_4.csv")
+env2019_4= pd.read_csv("/Users/meghanharris/Desktop/Env2019_5.csv")
+env2019_5= pd.read_excel("/Users/meghanharris/Desktop/Env2019_5.xlsx")
+env2019_6= pd.read_csv("/Users/meghanharris/Desktop/Env2019_6.csv")
+env2019= pd.concat([env2019,env2019_1,env2019_2,env2019_3,env2019_4,env2019_5,env2019_6], ignore_index=True)
+env2020= pd.read_csv("/Users/meghanharris/Desktop/Env2020.csv")
+env2020_1= pd.read_csv("/Users/meghanharris/Desktop/Env2020_1.csv")
+env2020_2= pd.read_csv("/Users/meghanharris/Desktop/Env2020_2.csv")
+env2020_3= pd.read_csv("/Users/meghanharris/Desktop/Env2020_3.csv")
+env2020_4= pd.read_csv("/Users/meghanharris/Desktop/Env2020_4.csv")
+env2020_5= pd.read_csv("/Users/meghanharris/Desktop/Env2020_6.csv")
+env2020= pd.concat([env2020,env2020_1,env2020_2,env2020_3,env2020_4,env2020_5], ignore_index=True)
+
+#for all values and years
+#2017
+env2017= env2017.loc[(env2017["Location"] == "Unit1")]
+env2017["timestamp"]= pd.to_datetime(env2017["timestamp"])
+env2017["timestamp"]= env2017["timestamp"].dt.round("1min")
+env2017= env2017.groupby("timestamp", as_index=False).agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+
+#2018
+env2018= env2018.loc[(env2018["Location"] == "Unit1")]
+env2018["timestamp"]= pd.to_datetime(env2018["timestamp"])
+env2018["timestamp"]= env2018["timestamp"].dt.round("1min")
+env2018= env2018.groupby("timestamp", as_index=False).agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+
+#2019
+env2019= env2019.loc[(env2019["Location"] == "Unit1")]
+env2019["timestamp"]= pd.to_datetime(env2019["timestamp"])
+env2019["timestamp"]= env2019["timestamp"].dt.round("1min")
+env2019= env2019.groupby("timestamp", as_index=False).agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+
+#2020
+env2020= env2020.loc[(env2020["Location"] == "Unit1")]
+env2020["timestamp"]= pd.to_datetime(env2020["timestamp"])
+env2020["timestamp"]= env2020["timestamp"].dt.round("1min")
+env2020= env2020.groupby("timestamp", as_index=False).agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+
+#for all values and years
+new1=new
+new1["Year"]= new1["Batch Start"].apply(lambda x: x.year)
+new1["Batch Start"]= new1["Batch Start"].dt.round("1min")
+new1["Batch Finish"]= new1["Batch Finish"].dt.round("1min")
+new1["TimeDiff"]= new1["TimeDiff"].dt.round("1min")
+new1["TimeDiff"] = pd.to_timedelta(new1["TimeDiff"])
+new1["Total Seconds"]= (new1["TimeDiff"].dt.total_seconds())
+hum = []
+temp = []
+pres = []
+uv = []
+dust = []
+
+#print(new1)
+
+for i in range(len(new1)):
+    start = new1.iloc[i]["Batch Finish"]
+    end = new1.iloc[i]["Batch Start"]
+    z = new1.iloc[i]["Year"]
+    if z == 2017:
+        templist = env2017.loc[(env2017["timestamp"] >= start) & (env2017["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+        hum.append(templist[0])
+        temp.append(templist[1])
+        pres.append(templist[2])
+        uv.append(templist[3])
+        dust.append(templist[4])
+    elif z == 2018:
+        templist1 = env2018.loc[(env2018["timestamp"] >= start) & (env2018["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+        hum.append(templist1[0])
+        temp.append(templist1[1])
+        pres.append(templist1[2])
+        uv.append(templist1[3])
+        dust.append(templist1[4])
+    elif z == 2019:
+        templist2 = env2019.loc[(env2019["timestamp"] >= start) & (env2019["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+        hum.append(templist2[0])
+        temp.append(templist2[1])
+        pres.append(templist2[2])
+        uv.append(templist2[3])
+        dust.append(templist2[4])
+    elif z == 2020:
+        templist3 = env2020.loc[(env2020["timestamp"] >= start) & (env2020["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+        hum.append(templist3[0])
+        temp.append(templist3[1])
+        pres.append(templist3[2])
+        uv.append(templist3[3])
+        dust.append(templist3[4])
+    elif z == 2021:
+        templist4 = env.loc[(env["timestamp"] >= start) & (env["timestamp"] <= end)].agg({"humidity": "mean", "tempertureF": "mean", "pressure":"mean","UV": "mean", "dust":"mean"})
+        hum.append(templist4[0])
+        temp.append(templist4[1])
+        pres.append(templist4[2])
+        uv.append(templist4[3])
+        dust.append(templist4[4])
+
+new1["Humidity"] = hum
+new1["Temperature"] = temp
+new1["Pressure"] = pres
+new1["UV"] = uv
+new1["Dust"] = dust
+
+#np.savetxt("/Users/meghanharris/Desktop/Cleaned_AllYears.csv",new1, fmt='%s',delimiter=',')
+new1.columns= ["jobnumber", "Batch Finish", "Batch Start", "TimeDiff", "Quality Score", "Year", "TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust"]
+#separating based on quality score
+qlty0_final = new1.loc[(new1["Quality Score"] == 0)]
+qlty1_final = new1.loc[(new1["Quality Score"] == 1)]
+qlty2_final = new1.loc[(new1["Quality Score"] == 2)]
+qlty3_final = new1.loc[(new1["Quality Score"] == 3)]
+qlty4_final = new1.loc[(new1["Quality Score"] == 4)]
+qlty5_final = new1.loc[(new1["Quality Score"] == 5)]
+#np.savetxt("/Users/meghanharris/Desktop/Quality0_AllYears.csv",qlty0_final, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality1_AllYears.csv",qlty1_final, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality2_AllYears.csv",qlty2_final, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality3_AllYears.csv",qlty3_final, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality4_AllYears.csv",qlty4_final, fmt='%s',delimiter=',')
+#np.savetxt("/Users/meghanharris/Desktop/Quality5_AllYears.csv",qlty5_final, fmt='%s',delimiter=',')
