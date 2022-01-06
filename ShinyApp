@@ -1,0 +1,66 @@
+
+######Shiny app
+
+ui <- navbarPage("Renaissance Services: Quality Score Predictor",
+      theme=shinytheme("superhero"),
+      tabPanel("Home",
+      titlePanel(div(
+        windowTitle = "Renaissance Services: Quality Score Predictor"),
+      )),
+      tabsetPanel(
+        type = "tabs",
+        tabPanel(
+          "Quality Score Prediction",
+  sidebarLayout(position="left",
+                sidebarPanel( 
+                  numericInput(inputId= "UV",
+                               label="Input UV value: ",
+                               value= 0.030,
+                               min=0, 
+                               max=1,
+                               width=400), 
+                  numericInput(inputId= "Humidity",
+                               label="Input Humidity value: ",
+                               value= 30,
+                               min=0, 
+                               max=60,
+                               width=400), 
+                  numericInput(inputId= "Dust",
+                               label="Input Dust value: ",
+                               value= 10,
+                               min=0, 
+                               max=20,
+                               width=400), 
+                  numericInput(inputId= "Pressure",
+                               label="Input Pressure value: ",
+                               value= 0.97,
+                               min=0, 
+                               max=1,
+                               width=400), 
+                  numericInput(inputId= "Temperature",
+                               label="Input Temperature value: ",
+                               value= 75.5,
+                               min=70, 
+                               max=80,
+                               width=400), 
+                  actionButton(inputId="button", label="Predict", class = "btn-warning"),
+                ),
+            mainPanel(textOutput("Pred"))
+  ))))
+                
+server <- function(input, output) {
+  data <-  eventReactive(input$button, {
+    data.frame(Temperature=input$Temperature,
+              Humidity=input$Humidity,
+              Dust=input$Dust,
+              Pressure=input$Pressure,
+              UV=input$UV,
+              stringasFactors=F)
+  })
+  control<- trainControl(method="repeatedcv", number=15, repeats=10)
+  rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity +Dust + Pressure + UV, data=train1, tuneLength=29, trControl=control )
+  output$Pred <- renderText( { paste("Predicted Quality Score :  ", 
+    predict(rf_model1, data())[1])
+})
+}
+shinyApp(ui=ui,server=server)
