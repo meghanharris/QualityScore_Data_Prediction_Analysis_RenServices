@@ -1,0 +1,661 @@
+#importing libraries
+library(readxl)
+library(ggplot2)
+library(stats)
+library(tidyverse)
+library(dplyr)
+library(ggcorrplot)
+library(caret)
+library(MASS)
+library(padr)
+library(Rmisc)
+library(scales)
+library(berryFunctions)
+library(gmodels)
+library(e1071)
+library(randomForest)
+library(klaR)
+library(rpart)
+library(shiny)
+library(shinythemes)
+library(rsconnect)
+options(scipen=999)
+###reading in excels###
+qlty0_all <- read.csv("Quality0_AllYears.csv")
+qlty1_all <- read.csv("Quality1_AllYears.csv")
+qlty2_all <- read.csv("Quality2_AllYears.csv")
+qlty3_all <- read.csv("Quality3_AllYears.csv")
+qlty4_all <- read.csv("Quality4_AllYears.csv")
+qlty5_all <- read.csv("Quality5_AllYears.csv")
+qlty_all <-read.csv("Cleaned_AllYears.csv")
+
+#Stats
+summary(qlty0_all)
+summary(qlty1_all)
+summary(qlty2_all)
+summary(qlty3_all)
+summary(qlty4_all)
+summary(qlty5_all)
+
+#Heat map w/ correlations
+qlty0_all <- qlty0_all[,c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust")]
+corr0_all <- round(cor(qlty0_all),3)
+qlty0corr<- ggcorrplot(corr0_all, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Quality 0 2017- 2021 Correlation Matrix")
+qlty0corr
+
+qlty1_all <- qlty1_all[,c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust")]
+corr1_all <- round(cor(qlty1_all),3)
+qlty1corr <- ggcorrplot(corr1_all, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Quality 1 2017- 2021 Correlation Matrix")
+qlty1corr
+
+qlty2_all <- qlty2_all[,c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust")]
+corr2_all <- round(cor(qlty2_all),3)
+ggcorrplot(corr2_all, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Quality 2 2017- 2021 Correlation Matrix")
+
+qlty3_all <- qlty3_all[,c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust")]
+corr3_all <- round(cor(qlty3_all),3)
+ggcorrplot(corr3_all, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Quality 3 2017- 2021 Correlation Matrix")
+
+qlty4_all <- qlty4_all[, c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust")]
+corr4_all <- round(cor(qlty4_all),3)
+ggcorrplot(corr4_all, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Quality 4 2017- 2021 Correlation Matrix")
+
+qlty5_all <- qlty5_all[, c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust")]
+corr5_all <- round(cor(qlty5_all),3)
+ggcorrplot(corr5_all, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Quality 5 2017- 2021 Correlation Matrix")
+
+#Difference of correlations b/t 0 + 1 scores and 4 + 5 scores
+corr0_1 <- (corr0_all + corr1_all)/2
+corr4_5 <- (corr4_all + corr5_all)/2
+diff <- corr4_5 - corr0_1
+ggcorrplot(diff, hc.order=TRUE, outline.color="black", lab=TRUE, lab_size=3,show.diag= FALSE, title= "Difference Between Quality Scores 0+1 and 4+5 Correlation Matrix")
+
+#mapping the difference in correlations
+min01 <- min((length(qlty0_all$Temperature)), length(qlty1_all$Temperature), length(qlty0_all$TimeinSeconds), length(qlty1_all$TimeinSeconds))
+tt01 <- data.frame(cbind((qlty0_all$Temperature[seq(min01)] + qlty1_all$Temperature[seq(min01)])/2, ((qlty0_all$TimeinSeconds[seq(min01)] + qlty1_all$TimeinSeconds[seq(min01)])/2)))
+colnames(tt01) <- c("Temperature","Time")
+min45 <- min(length(qlty4_all$Temperature),length(qlty5_all$Temperature), length(qlty4_all$TimeinSeconds), length(qlty5_all$TimeinSeconds))
+tt45 <- data.frame(cbind((qlty4_all$Temperature[seq(min45)] + qlty5_all$Temperature[seq(min45)])/2, ((qlty5_all$TimeinSeconds[seq(min45)] + qlty4_all$TimeinSeconds[seq(min45)])/2)))
+colnames(tt45) <- c("Temperature", "Time")
+
+ggplot(data=tt01, aes(x=Time, y=Temperature)) + geom_point(data=tt01, aes(x=Time/3600, y=Temperature, color="light red")) + geom_point(data=tt45, aes(x=Time/3600, y=Temperature, color="blue"))
+
+###########Exploratory Data Analysis####################
+#Scatterplots of relationships based on correlation value
+#Humidity x Temperature
+hum_temp_sc <- ggplot(qlty_all, aes(x=Temperature, y=Humidity, color=Quality.Score)) + geom_point() + ggtitle("Humidity x Temperature Relationship by Quality Score")
+hum_temp_sc + geom_smooth(method="lm", se=FALSE)
+hum_temp_sc + facet_grid(vars(rows=Quality.Score)) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Dust x Humidity
+hum_dust_sc <- ggplot(qlty_all, aes(x=Dust, y=Humidity, color=Quality.Score)) + geom_point() + ggtitle("Humidity x Dust Relationship by Quality Score")
+hum_dust_sc + geom_smooth(method="lm", se=FALSE)
+hum_dust_sc + facet_grid(vars(rows=Quality.Score)) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Time x UV
+time_uv_sc <- ggplot(qlty_all, aes(x=TimeinSeconds/3600, y=UV, color=Quality.Score)) + geom_point() + ggtitle("Time (in hours) x UV Relationship by Quality Score") + xlab("Time (in hours)")
+time_uv_sc + geom_smooth(method="lm", se=FALSE)
+time_uv_sc + facet_grid(vars(rows=Quality.Score)) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#UV x Dust
+uv_dust_sc <- ggplot(qlty_all, aes(x=UV, y=Dust, color=Quality.Score)) + geom_point() + ggtitle("Dust x UV Relationship by Quality Score")
+uv_dust_sc + geom_smooth(method="lm", se=FALSE)
+uv_dust_sc + facet_grid(vars(rows=Quality.Score)) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Determining outliers by all variables by quality score
+#Pressure
+pres_box <- ggplot(qlty_all, aes(x=Quality.Score, y=Pressure, color=Quality.Score)) + geom_boxplot() + ggtitle("Pressure Outlier Analysis by Quality Score") + ylab("Pressure") + facet_wrap(~ Quality.Score, ncol=6, strip.position="bottom") + theme(axis.text.x = element_blank(), axis.ticks = element_blank())
+pres_box
+
+#Humidity
+hum_box <- ggplot(qlty_all, aes(x=Quality.Score, y=Humidity, color=Quality.Score)) + geom_boxplot() + ggtitle("Humidity Outlier Analysis by Quality Score") + ylab("Humidity") + facet_wrap(~ Quality.Score, ncol=6, strip.position="bottom") + theme(axis.text.x = element_blank(), axis.ticks = element_blank())
+hum_box
+
+#Time
+time_box <- ggplot(qlty_all, aes(x=Quality.Score, y=TimeinSeconds/ 3600, color=Quality.Score)) + geom_boxplot() + ggtitle("Time (in hours) Outlier Analysis by Quality Score") + ylab("Time (in hours)") + facet_wrap(~ Quality.Score, ncol=6, strip.position="bottom") + theme(axis.text.x = element_blank(), axis.ticks = element_blank())
+time_box
+
+#UV
+uv_box <- ggplot(qlty_all, aes(x=Quality.Score, y=UV, color=Quality.Score)) + geom_boxplot() + ggtitle("UV Outlier Analysis by Quality Score") + ylab("UV") + facet_wrap(~ Quality.Score, ncol=6, strip.position="bottom") + theme(axis.text.x = element_blank(), axis.ticks = element_blank())
+uv_box
+
+#Temperature
+temp_box <- ggplot(qlty_all, aes(x=Quality.Score, y=Temperature, color=Quality.Score)) + geom_boxplot() + ggtitle("Temperature Outlier Analysis by Quality Score") + ylab("Temperature") + facet_wrap(~ Quality.Score, ncol=6, strip.position="bottom") + theme(axis.text.x = element_blank(), axis.ticks = element_blank())
+temp_box
+
+#Dust
+dust_box <- ggplot(qlty_all, aes(x=Quality.Score, y=Dust, color=Quality.Score)) + geom_boxplot() + ggtitle("Dust Outlier Analysis by Quality Score") + ylab("Dust") + facet_wrap(~ Quality.Score, ncol=6, strip.position="bottom") + theme(axis.text.x = element_blank(), axis.ticks = element_blank())
+dust_box
+
+########Determining if there are outliers within each variables by quality score
+#Removing outliers in UV
+UV0 <- boxplot(qlty_all$UV)
+UV0 <- unlist(qlty_all$UV)
+UV0_no <- UV0[!UV0 %in% boxplot.stats(UV0)$out]
+
+#Removing outliers in TimeinSeconds
+Time0 <- boxplot(qlty_all$TimeinSeconds)
+Time0 <- unlist(qlty_all$TimeinSeconds)
+Time0_no <- Time0[!Time0 %in% boxplot.stats(Time0)$out]
+
+#Removing outliers in Temperature
+Temp0 <- boxplot(qlty_all$Temperature)
+Temp0 <- unlist(qlty_all$Temperature)
+Temp0_no <- Temp0[!Temp0 %in% boxplot.stats(Temp0)$out]
+
+#Removing outliers in Dust
+Dust0 <- boxplot(qlty_all$Dust)
+Dust0 <- unlist(qlty_all$Dust)
+Dust0_no <- Dust0[!Dust0 %in% boxplot.stats(Dust0)$out]
+
+#Removing outliers in Pressure
+Pres0 <- boxplot(qlty_all$Pressure)
+Pres0 <- unlist(qlty_all$Pressure)
+Pres0_no <- Pres0[!Pres0 %in% boxplot.stats(Pres0)$out]
+
+#Removing outliers in Humidity
+Hum0 <- boxplot(qlty_all$Humidity)
+Hum0 <- unlist(qlty_all$Humidity)
+Hum0_no <- Hum0[!Hum0 %in% boxplot.stats(Hum0)$out]
+
+#Determining correlation effect w/ removing outliers
+#Dust and Humidity: 0.5036416
+n <- min(length(Dust0_no),length(Hum0_no))
+cor(Dust0_no[seq(n)], Hum0_no[seq(n)])
+
+#Time and UV: -0.0295158
+r <- min(length(Time0_no),length(UV0_no))
+cor(Time0_no[seq(r)], UV0_no[seq(r)])
+
+#Humidity and Temp: -0.4308733
+z <- min(length(Hum0_no),length(Temp0_no))
+cor(Hum0_no[seq(z)], Temp0_no[seq(z)])
+
+#Dust x Time: -0.01352722
+t <- min(length(Dust0_no),length(Time0_no))
+cor(Dust0_no[seq(t)], Time0_no[seq(t)])
+
+#Humidity x Time: 0.00924655
+y <- min(length(Hum0_no),length(Time0_no))
+cor(Hum0_no[seq(y)], Time0_no[seq(y)])
+
+#Temp x Time: -0.1144828
+o <- min(length(Temp0_no),length(Time0_no))
+cor(Temp0_no[seq(o)], Time0_no[seq(o)])
+
+#Pressure x Time: 0.02547327
+u <- min(length(Pres0_no),length(Time0_no))
+cor(Pres0_no[seq(u)], Time0_no[seq(u)])
+
+#Dust x Pressure: 0.02547327
+q <- min(length(Dust0_no),length(Pres0_no))
+cor(Dust0_no[seq(q)], Pres0_no[seq(q)])
+
+#Humidity x Pressure: -0.236731
+e <- min(length(Hum0_no),length(Pres0_no))
+cor(Hum0_no[seq(e)], Pres0_no[seq(e)])
+
+#Temperature x Pressure: 
+w <- min(length(Temp0_no),length(Pres0_no))
+cor(Temp0_no[seq(w)], Pres0_no[seq(w)])
+
+#UV x Pressure: 0.06119338
+a <- min(length(UV0_no),length(Pres0_no))
+cor(UV0_no[seq(a)], Pres0_no[seq(a)])
+
+#Time x Pressure: 0.02547327
+b <- min(length(Time0_no),length(Pres0_no))
+cor(Time0_no[seq(b)], Pres0_no[seq(b)])
+
+#Dust x UV: 0.4977245
+c <- min(length(Dust0_no),length(UV0_no))
+cor(Dust0_no[seq(c)], UV0_no[seq(c)])
+
+#Humidity x UV: 0.2742656
+d <- min(length(Hum0_no),length(UV0_no))
+cor(Hum0_no[seq(d)], UV0_no[seq(d)])
+
+#Temperature x UV: -0.1730851
+e <- min(length(Temp0_no),length(UV0_no))
+cor(Temp0_no[seq(e)], UV0_no[seq(e)])
+
+#Pressure x UV: 0.06119338
+f <- min(length(Pres0_no),length(UV0_no))
+cor(Pres0_no[seq(f)], UV0_no[seq(f)])
+
+#Dust x Temperature: -0.2037687
+g <- min(length(Dust0_no),length(Temp0_no))
+cor(Dust0_no[seq(g)], Temp0_no[seq(g)])
+
+#UV x Temperature: -0.1730851
+h <- min(length(UV0_no),length(Temp0_no))
+cor(UV0_no[seq(h)], Temp0_no[seq(h)])
+
+#creating heatmap w/o outliers for all variables
+first_column= c("-0.013", "0.009", "-0.11","-0.029","0.02", "1")
+second_column= c("-0.02", "-0.23", "-0.03", "0.06", "1", "0.02")
+third_column= c("0.49", "0.27", "-0.17", "1", "0.06", "-0.029")
+fourth_column= c("-.20", "-0.44", "1", "-0.17","-0.03","-0.11")
+fifth_column= c("0.5", "1", "-0.44", "0.27", "-0.23", "0.009")
+sixth_column= c("1", "0.5", "-0.20", "0.49", "-0.02", "-0.013")
+wo_outliers <- data.frame(first_column, second_column, third_column, fourth_column, fifth_column, sixth_column)
+colnames(wo_outliers)<- c("Time","Pressure" ,"UV", "Temperature" , "Humidity" , "Dust")
+rownames(wo_outliers) <-c("Dust", "Humidity", "Temperature", "UV", "Pressure", "Time")
+wo_outliers1 <- wo_outliers %>%
+  rownames_to_column() %>%
+  gather(colname, value, -rowname)
+#creating heatmap
+ggplot(wo_outliers1, aes(x=rowname, y=colname, fill=value)) + geom_tile(color="black") + geom_text(aes(label=value), color="black") + theme(axis.title.y= element_blank(), axis.title.x=element_blank()) + ggtitle("Correlation Matrix Across All Years Without Outliers")
+
+######Scatterplots of relationships based on correlation value w/o outliers
+#Humidity x Temperature
+z1 <- as.data.frame(Hum0_no[seq(z)])
+z1 <- cbind(z1, Temp0_no[seq(z)])
+z1<- cbind(z1, qlty_all$Quality.Score[seq(z)])
+hum_temp_sc_wo <- ggplot(z1, aes(x=Temp0_no[seq(z)], y=Hum0_no[seq(z)], color=qlty_all$Quality.Score[seq(z)])) + geom_point() + ggtitle("Humidity x Temperature Relationship by Quality Score (Without Outliers)") + ylab("Humidity") + xlab("Temperature") + labs(color="Quality.Score")
+hum_temp_sc_wo + geom_smooth(method="lm", se=FALSE)
+hum_temp_sc_wo + facet_grid(vars(rows=qlty_all$Quality.Score[seq(z)])) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Dust x Humidity
+n1 <- as.data.frame(Hum0_no[seq(n)])
+n1 <- cbind(n1, Dust0_no[seq(n)])
+n1<- cbind(n1, qlty_all$Quality.Score[seq(n)])
+hum_dust_sc_wo <- ggplot(n1, aes(x=Dust0_no[seq(n)], y=Hum0_no[seq(n)], color=qlty_all$Quality.Score[seq(n)])) + geom_point() + ggtitle("Humidity x Dust Relationship by Quality Score (Without Outliers)") + ylab("Humidity") + xlab("Dust") + labs(color="Quality.Score")
+hum_dust_sc_wo + geom_smooth(method="lm", se=FALSE)
+hum_dust_sc_wo + facet_grid(vars(rows=qlty_all$Quality.Score[seq(n)])) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Time x UV
+r1 <- as.data.frame(UV0_no[seq(r)])
+r1 <- cbind(r1, Time0_no[seq(r)])
+r1<- cbind(r1, qlty_all$Quality.Score[seq(r)])
+time_uv_sc_wo <- ggplot(r1, aes(x=Time0_no[seq(r)]/3600, y=UV0_no[seq(r)], color=qlty_all$Quality.Score[seq(r)])) + geom_point() + ggtitle("Time (in hours) x UV Relationship by Quality Score (Without Outliers)") + xlab("Time (in hours)") +ylab("UV") + labs(color="Quality.Score")
+time_uv_sc_wo + geom_smooth(method="lm", se=FALSE)
+time_uv_sc_wo + facet_grid(vars(rows=qlty_all$Quality.Score[seq(r)])) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Dust x UV
+c1 <- as.data.frame(UV0_no[seq(c)])
+c1 <- cbind(c1, Dust0_no[seq(c)])
+c1<- cbind(c1, qlty_all$Quality.Score[seq(c)])
+dust_uv_sc_wo <- ggplot(c1, aes(x=UV0_no[seq(c)], y=Dust0_no[seq(c)], color=qlty_all$Quality.Score[seq(c)])) + geom_point() + ggtitle("Dust x UV Relationship by Quality Score (Without Outliers)") + xlab("Dust") +ylab("UV") + labs(color="Quality.Score")
+dust_uv_sc_wo + geom_smooth(method="lm", se=FALSE)
+dust_uv_sc_wo + facet_grid(vars(rows=qlty_all$Quality.Score[seq(c)])) + geom_smooth(method="lm", se=FALSE, color="black")
+
+#Creating df w/ no outliers
+no <- min(length(Pres0_no),length(UV0_no),length(Temp0_no),length(Hum0_no), length(Dust0_no), length(qlty_all$Quality.Score))
+qlty_all_no <- as.data.frame(UV0_no[seq(no)])
+qlty_all_no <- cbind(qlty_all_no, Temp0_no[seq(no)],Pres0_no[seq(no)], Hum0_no[seq(no)], Dust0_no[seq(no)], qlty_all$Quality.Score[seq(no)], Time0_no[seq(no)])
+colnames(qlty_all_no)= c("UV", "Temperature", "Pressure", "Humidity", "Dust", "Quality.Score", "Time")
+
+#########MEAN ANALYSIS ACROSS VARIABLES INCLUDING W/ OUTLIERS and W/O OUTLIERS#########
+#Temperature
+qlty_all_mean <- qlty_all %>%
+  group_by(Quality.Score) %>%
+  summarize(average=mean(Temperature)) %>%
+  ungroup()
+summary(Temp0_no)
+
+qlty_all %>%
+  ggplot(mapping= aes(x=Quality.Score, y=Temperature)) +
+  geom_line(data=qlty_all_mean, mapping= aes(x=Quality.Score, y=average, group=1, color="red")) + 
+  geom_point(data=qlty_all_mean, mapping= aes(x=Quality.Score, y=average), color="red", size=3) +
+  geom_text(data=qlty_all_mean, aes(label=round(average,2), y=average + 0.05))+ 
+  ggtitle("Average Temperature by Quality Score From 2017-2021")
+
+
+#UV
+qlty_all_mean_UV <- qlty_all %>%
+  group_by(Quality.Score) %>%
+  summarize(average=mean(UV)) %>%
+  ungroup()
+
+qlty_all %>%
+  ggplot(mapping= aes(x=Quality.Score, y=UV)) +
+  geom_line(data=qlty_all_mean_UV, mapping= aes(x=Quality.Score, y=average, group=1, color="red")) + 
+  geom_point(data=qlty_all_mean_UV, mapping= aes(x=Quality.Score, y=average), color="red", size=3) +
+  geom_text(data=qlty_all_mean_UV, aes(label=round(average,3), y=average - 0.001))+ 
+  ggtitle("Average UV by Quality Score From 2017-2021") +
+  theme(legend.position="none")
+
+#Humidity
+qlty_all_mean_hum <- qlty_all %>%
+  group_by(Quality.Score) %>%
+  summarize(average=mean(Humidity)) %>%
+  ungroup()
+
+qlty_all %>%
+  ggplot(mapping= aes(x=Quality.Score, y=Humidity)) +
+  geom_line(data=qlty_all_mean_hum, mapping= aes(x=Quality.Score, y=average, group=1, color="red")) + 
+  geom_point(data=qlty_all_mean_hum, mapping= aes(x=Quality.Score, y=average), color="red", size=3) +
+  geom_text(data=qlty_all_mean_hum, aes(label=round(average,2), y=average + 1.5))+ 
+  ggtitle("Average Humidity by Quality Score From 2017-2021") +
+  theme(legend.position="none")
+
+#Dust
+qlty_all_mean_dust <- qlty_all %>%
+  group_by(Quality.Score) %>%
+  summarize(average=mean(Dust)) %>%
+  ungroup()
+
+qlty_all %>%
+  ggplot(mapping= aes(x=Quality.Score, y=Dust)) +
+  geom_line(data=qlty_all_mean_dust, mapping= aes(x=Quality.Score, y=average, group=1, color="red")) + 
+  geom_point(data=qlty_all_mean_dust, mapping= aes(x=Quality.Score, y=average), color="red", size=3) +
+  geom_text(data=qlty_all_mean_dust, aes(label=round(average,2), y=average + 1))+ 
+  ggtitle("Average Dust by Quality Score From 2017-2021") +
+  theme(legend.position="none")
+
+#Pressure
+qlty_all_mean_pres <- qlty_all %>%
+  group_by(Quality.Score) %>%
+  summarize(average=mean(Pressure)) %>%
+  ungroup()
+
+qlty_all %>%
+  ggplot(mapping= aes(x=Quality.Score, y=Pressure)) +
+  geom_line(data=qlty_all_mean_pres, mapping= aes(x=Quality.Score, y=average, group=1, color="red")) + 
+  geom_point(data=qlty_all_mean_pres, mapping= aes(x=Quality.Score, y=average), color="red", size=3) +
+  geom_text(data=qlty_all_mean_pres, aes(label=round(average,4), y=average + 0.0001))+ 
+  ggtitle("Average Pressure by Quality Score From 2017-2021") +
+  theme(legend.position="none")
+
+#TimeinSeconds
+qlty_all_mean_time <- qlty_all %>%
+  group_by(Quality.Score) %>%
+  summarize(average=mean(TimeinSeconds/3600)) %>%
+  ungroup()
+
+qlty_all %>%
+  ggplot(mapping= aes(x=Quality.Score, y= (TimeinSeconds/3600))) +
+  geom_line(data=qlty_all_mean_time, mapping= aes(x=Quality.Score, y=average, group=1, color="red")) + 
+  geom_point(data=qlty_all_mean_time, mapping= aes(x=Quality.Score, y=average), color="red", size=3) +
+  geom_text(data=qlty_all_mean_time, aes(label=round(average,2), y=average + 2))+ 
+  ggtitle("Average Time (in hours) by Quality Score From 2017-2021") +
+  ylab("Time in hours") +
+  theme(legend.position="none")
+
+############MODELING AND PREDICTION####################
+#Calculating the confidence intervals of variables by quality score
+#Quality Score = 0
+model0 <- glm(Quality.Score == 0 ~ Temperature + Humidity + Dust + Pressure + UV, data=qlty_all,family=binomial(link='logit'))
+summary(model0)
+ggplot(data=qlty0_all, aes(x=Temperature, color=Quality.Score)) + geom_histogram() + geom_vline(xintercept=-0.008507, color="red") +geom_vline(xintercept=-0.068232, color="red")
+temp0 <- CI(qlty0_all$Temperature, ci=0.95 )
+hum0 <-CI(qlty0_all$Humidity, ci=0.95)
+dust0 <-CI(qlty0_all$Dust, ci=0.95)
+pres0 <-CI(qlty0_all$Pressure, ci=0.95)
+uv0 <- CI(qlty0_all$UV, ci=0.95)
+
+#Quality Score = 1
+model1<- glm(Quality.Score == 1 ~ Temperature + Humidity + Dust + Pressure + UV, data=qlty_all, family=binomial(link='logit'))
+summary(model1)
+temp1<- CI(qlty1_all$Temperature, ci=0.95 )
+hum1<- CI(qlty1_all$Humidity, ci=0.95)
+dust1 <-CI(qlty1_all$Dust, ci=0.95)
+pres1 <-CI(qlty1_all$Pressure, ci=0.95)
+uv1<- CI(qlty1_all$UV, ci=0.95)
+
+#Quality Score = 2
+model2<- glm(Quality.Score == 2 ~ Temperature + Humidity + Dust + Pressure + UV, data=qlty_all, family=binomial(link='logit'))
+summary(model2)
+temp2<- CI(qlty2_all$Temperature, ci=0.95 )
+hum2<- CI(qlty2_all$Humidity, ci=0.95)
+dust2 <- CI(qlty2_all$Dust, ci=0.95)
+pres2 <-CI(qlty2_all$Pressure, ci=0.95)
+uv2 <-CI(qlty2_all$UV, ci=0.95)
+
+#Quality Score = 3
+model3<- glm(Quality.Score == 3 ~ Temperature + Humidity + Dust + Pressure + UV, data=qlty_all, family=binomial(link='logit'))
+summary(model3)
+temp3 <- CI(qlty3_all$Temperature, ci=0.95 )
+hum3 <- CI(qlty3_all$Humidity, ci=0.95)
+dust3 <- CI(qlty3_all$Dust, ci=0.95)
+pres3 <- CI(qlty3_all$Pressure, ci=0.95)
+uv3<- CI(qlty3_all$UV, ci=0.95)
+
+#Quality Score = 4
+model4<- glm(Quality.Score == 4 ~ Temperature + Humidity + Dust + Pressure + UV + TimeinSeconds, data=qlty_all, family=binomial(link='logit'))
+summary(model4)
+temp4 <- CI(qlty4_all$Temperature, ci=0.95 )
+hum4 <- CI(qlty4_all$Humidity, ci=0.95)
+dust4 <-CI(qlty4_all$Dust, ci=0.95)
+pres4<- CI(qlty4_all$Pressure, ci=0.95)
+uv4<- CI(qlty4_all$UV, ci=0.95)
+
+#Quality Score = 5
+model5<- glm(Quality.Score == 5 ~ Temperature + Humidity + Dust + Pressure + UV, data=qlty_all, family=binomial(link='logit'))
+summary(model5)
+temp5<- CI(qlty5_all$Temperature, ci=0.95)
+hum5 <- CI(qlty5_all$Humidity, ci=0.95)
+dust5<-CI(qlty5_all$Dust, ci=0.95)
+pres5<- CI(qlty5_all$Pressure, ci=0.95)
+uv5 <-CI(qlty5_all$UV, ci=0.95)
+
+#combining confidence intervals
+#Temperature
+quality<- c("0", "1", "2", "3", "4", "5")
+tempCI <- rbind(temp0, temp1, temp2, temp3, temp4, temp5)
+tempCI <- cbind(tempCI, quality)
+tempCI <- as.data.frame(tempCI, stringsAsFactors=FALSE)
+tempCI <- tempCI[,c(4,3,2,1)]
+tempCI[,c(2,3,4)] <- round(as.numeric(unlist(tempCI[,c(2,3,4)])),1)
+tempCI
+ggplot(data=tempCI, aes(x=mean, y=quality)) + geom_point(data=tempCI, aes(x=lower, y=quality, color=quality, size=20)) + geom_point(data=tempCI, aes(x=mean, y=quality, color=quality, size=20)) + geom_point(data=tempCI, aes(x=upper, y=quality, color=quality, size=20)) + geom_text(data=tempCI, aes(label=mean, size=20)) + xlab("Temperature") + guides(size=FALSE) +ggtitle("Temperature 95% Confidence Intervals by Quality Score")
+
+#Humidity
+quality<- c("0", "1", "2", "3", "4", "5")
+humCI <- rbind(hum0, hum1, hum2, hum3, hum4, hum5)
+humCI <- cbind(humCI, quality)
+humCI <- as.data.frame(humCI, stringsAsFactors=FALSE)
+humCI <- humCI[,c(4,3,2,1)]
+humCI[,c(2,3,4)] <- round(as.numeric(unlist(humCI[,c(2,3,4)])),1)
+humCI
+ggplot(data=humCI, aes(x=mean, y=quality)) + geom_point(data=humCI, aes(x=lower, y=quality, color=quality, size=20)) + geom_point(data=humCI, aes(x=mean, y=quality, color=quality, size=20)) + geom_point(data=humCI, aes(x=upper, y=quality, color=quality, size=20)) + geom_text(data=humCI, aes(label=mean, size=20)) + xlab("Humidity") + guides(size=FALSE) +ggtitle("Humidity 95% Confidence Intervals by Quality Score")
+
+#Dust
+quality<- c("0", "1", "2", "3", "4", "5")
+dustCI <- rbind(dust0, dust1, dust2, dust3, dust4, dust5)
+dustCI <- cbind(dustCI, quality)
+dustCI <- as.data.frame(dustCI, stringsAsFactors=FALSE)
+dustCI <- dustCI[,c(4,3,2,1)]
+dustCI[,c(2,3,4)] <- round(as.numeric(unlist(dustCI[,c(2,3,4)])),1)
+dustCI
+ggplot(data=dustCI, aes(x=mean, y=quality)) + geom_point(data=dustCI, aes(x=lower, y=quality, color=quality, size=20)) + geom_point(data=dustCI, aes(x=mean, y=quality, color=quality, size=20)) + geom_point(data=dustCI, aes(x=upper, y=quality, color=quality, size=20)) + geom_text(data=dustCI, aes(label=mean, size=20)) + xlab("Dust") + guides(size=FALSE) +ggtitle("Dust 95% Confidence Intervals by Quality Score")
+
+#Pressure
+quality<- c("0", "1", "2", "3", "4", "5")
+presCI <- rbind(pres0, pres1, pres2, pres3, pres4, pres5)
+presCI <- cbind(presCI, quality)
+presCI <- as.data.frame(presCI, stringsAsFactors=FALSE)
+presCI <- presCI[,c(4,3,2,1)]
+presCI[,c(2,3,4)] <- round(as.numeric(unlist(presCI[,c(2,3,4)])),3)
+presCI
+ggplot(data=presCI, aes(x=mean, y=quality)) + geom_point(data=presCI, aes(x=lower, y=quality, color=quality, size=20)) + geom_point(data=presCI, aes(x=mean, y=quality, color=quality, size=20)) + geom_point(data=presCI, aes(x=upper, y=quality, color=quality, size=20)) + geom_text(data=presCI, aes(label=mean, size=20)) + xlab("Pressure") + guides(size=FALSE) +ggtitle("Pressure 95% Confidence Intervals by Quality Score")
+
+#UV
+quality<- c("0", "1", "2", "3", "4", "5")
+uvCI <- rbind(uv0, uv1, uv2, uv3, uv4, uv5)
+uvCI <- cbind(uvCI, quality)
+uvCI <- as.data.frame(uvCI, stringsAsFactors=FALSE)
+uvCI <- uvCI[,c(4,3,2,1)]
+uvCI[,c(2,3,4)] <- round(as.numeric(unlist(uvCI[,c(2,3,4)])),3)
+uvCI
+ggplot(data=uvCI, aes(x=mean, y=quality)) + geom_point(data=uvCI, aes(x=lower, y=quality, color=quality, size=20)) + geom_point(data=uvCI, aes(x=mean, y=quality, color=quality, size=20)) + geom_point(data=uvCI, aes(x=upper, y=quality, color=quality, size=20)) + geom_text(data=uvCI, aes(label=mean, size=20)) + xlab("UV") + guides(size=FALSE) +ggtitle("UV 95% Confidence Intervals by Quality Score")
+
+######MODELING#########
+#Random Forest w outliers
+qlty_all$Quality.Score <- as.factor(qlty_all$Quality.Score)
+levels(qlty_all$Quality.Score) <- c(0,1,2,3,4,5)
+index <- createDataPartition(qlty_all$Quality.Score, p=.70, list=FALSE)
+train<- qlty_all[index,]
+test<- qlty_all[-index,]
+rf_model <- randomForest(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train )
+predicted_rf <- predict(rf_model, test, type="class")
+confusionMatrix(predicted_rf, test$Quality.Score)
+#Balanced Accuracy: 72.71%
+
+#Random Forest w/o outliers
+set.seed(1234)
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+qlty_all_no$Quality.Score
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train1 )
+predicted_rf1 <- predict(rf_model1, test1, type="class")
+confusionMatrix(predicted_rf1, test1$Quality.Score)
+#Accuracy: 76.53%
+
+#Random Forest w/o outliers with tuning parameters
+set.seed(1234)
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+qlty_all_no$Quality.Score
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+control<- trainControl(method="repeatedcv", number=10,repeats=3, search="random" )
+rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train1, tuneLength=15, trControl=control )
+predicted_rf1 <- predict(rf_model1, test1, type="class")
+confusionMatrix(predicted_rf1, test1$Quality.Score)
+#Accuracy: 76.52%
+
+#Random Forest w/o outliers with other tuning parameters
+set.seed(1234)
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+qlty_all_no$Quality.Score
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+bestmtry<- tuneRF(qlty_all_no$Temperature + qlty_all_no$Humidity + qlty_all_no$Dust + qlty_all_no$Pressure + qlty_all_no$UV, qlty_all_no$Quality.Score, stepFactor=1.5, improve=1e-5,ntree=500)
+control<- trainControl(method="boot")
+rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity +Dust + Pressure + UV, data=train1, tuneLength=1, trControl=control )
+predicted_rf1 <- predict(rf_model1, test1, type="class")
+confusionMatrix(predicted_rf1, test1$Quality.Score)
+#Accuracy: 76.65%
+
+#Random Forest w/o outliers with other tuning parameters
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+control<- trainControl(method="boot")
+rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity +Dust + Pressure + UV, data=train1, tuneLength=20, trControl=control )
+predicted_rf1 <- predict(rf_model1, test1, type="class")
+confusionMatrix(predicted_rf1, test1$Quality.Score)
+#Accuracy: 82.18%
+
+#Random Forest w/o outliers with other tuning parameters
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+control<- trainControl(method="LOOCV")
+rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity +Dust + Pressure + UV, data=train1, tuneLength=20, trControl=control )
+predicted_rf1 <- predict(rf_model1, test1, type="class")
+confusionMatrix(predicted_rf1, test1$Quality.Score)
+#Accuracy: 81.05%
+
+#Random Forest w/o outliers with other tuning parameters
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+control<- trainControl(method="repeatedcv", number=15, repeats=10)
+rf_model1 <- randomForest(Quality.Score ~ Temperature + Humidity +Dust + Pressure + UV, data=train1, tuneLength=29, trControl=control )
+predicted_rf1 <- predict(rf_model1, test1, type="class")
+confusionMatrix(predicted_rf1, test1$Quality.Score)
+#Accuracy: 83.82%
+
+#SVM
+svm1 <- svm(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train, method="C-classification", kernal="radial", gamma=0.1, cost=10 )
+predict_svm <- predict(svm1, test)
+predict_svm
+confusionMatrix(predict_svm, test$Quality.Score)
+#Balanced Accuracy: 63.12%
+
+#SVM w/o outliers
+svm2 <- svm(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train1, method="C-classification", kernal="radial", gamma=0.1, cost=10 )
+predict_svm1 <- predict(svm2, test1)
+predict_svm1
+confusionMatrix(predict_svm1, test1$Quality.Score)
+#Balanced Accuracy: 63.52%
+
+#NaiveBayes
+nb <- naive_bayes(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train, usekernel=T)
+predict_nb <- predict(nb, test)
+confusionMatrix(predict_nb, test$Quality.Score)
+#Balanced Accuracy: 65.29%
+
+#NaiveBayes w/o outliers
+nb1 <- naive_bayes(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train1, usekernel=T)
+predict_nb1 <- predict(nb1, test1)
+confusionMatrix(predict_nb1, test1$Quality.Score)
+#Balanced Accuracy: 63.37%
+
+#Boosting w/o outliers
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+gmb_m1 <- train(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV, data=train1, method="xgbTree", trControl=trainControl("cv", number=10))
+gmb_m1$bestTune
+gmb_p1 <- predict(gmb_m1, test1)
+confusionMatrix(gmb_p1, test1$Quality.Score)
+#75.22%
+
+#Boosting w/ outliers and Time
+qlty_all$Quality.Score <- as.factor(qlty_all$Quality.Score)
+levels(qlty_all$Quality.Score) <- c(0,1,2,3,4,5)
+index <- createDataPartition(qlty_all$Quality.Score, p=.70, list=FALSE)
+train<- qlty_all[index,]
+test<- qlty_all[-index,]
+gmb_m <- train(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV +TimeinSeconds, data=train, method="xgbTree", trControl=trainControl("cv", number=10))
+gmb_m$bestTune
+gmb_p <- predict(gmb_m, test)
+confusionMatrix(gmb_p, test$Quality.Score)
+#75.62%
+
+#Boosting w/o outliers + Time included
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+gmb_m1 <- train(Quality.Score ~ Temperature + Humidity + Dust + Pressure + UV +Time, data=train1, method="xgbTree", trControl=trainControl("cv", number=10))
+gmb_m1$bestTune
+gmb_p1 <- predict(gmb_m1, test1)
+confusionMatrix(gmb_p1, test1$Quality.Score)
+#74.76%
+
+#Ordinal Forest w/ outliers w/ time
+qlty_all <- qlty_all[,c("TimeinSeconds", "Humidity", "Temperature", "Pressure", "UV", "Dust","Quality.Score")]
+qlty_all$Quality.Score <- as.factor(qlty_all$Quality.Score)
+levels(qlty_all$Quality.Score) <- c(0,1,2,3,4,5)
+index <- createDataPartition(qlty_all$Quality.Score, p=.70, list=FALSE)
+train<- qlty_all[index,]
+test<- qlty_all[-index,]
+ordforres <- ordfor(depvar="Quality.Score", data=train, nsets=1000, ntreeperdiv=100,
+                    ntreefinal=7000, perffunction = "probability")
+of<- predict(ordforres, test)
+confusionMatrix(of$ypred, test$Quality.Score)
+#Balanced Accuracy: 74.39%
+
+#Ordinal Forest w/ outliers
+qlty_all_no <- qlty_all_no[,c("Humidity", "Temperature", "Pressure", "UV", "Dust","Quality.Score")]
+qlty_all_no$Quality.Score <- as.factor(qlty_all_no$Quality.Score)
+levels(qlty_all_no$Quality.Score) <- c(0,1,2,3,4,5)
+index1 <- createDataPartition(qlty_all_no$Quality.Score, p=.70, list=FALSE)
+train1<- qlty_all_no[index1,]
+test1<- qlty_all_no[-index1,]
+ordforres1 <- ordfor(depvar="Quality.Score", data=train1, nsets=1000, ntreeperdiv=100,
+                     ntreefinal=7000, perffunction = "probability")
+of1<- predict(ordforres1, test1)
+confusionMatrix(of1$ypred, test1$Quality.Score)
+#Balanced Accuracy: 76.36%
+
